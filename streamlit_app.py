@@ -3,8 +3,9 @@ import subprocess
 from rag.pipeline import answer
 
 st.set_page_config(page_title="CeADAR RAG", layout="wide")
-st.title("CeADAR RAG Prototype (Groq + Open Embeddings)")
+st.title("CeADAR RAG Prototype")
 st.caption("Chat memory improves retrieval, while answers remain grounded ONLY in retrieved document context.")
+st.sidebar.caption("BUILD: sources-persist-v2")
 
 # ---------- Session State ----------
 if "messages" not in st.session_state:
