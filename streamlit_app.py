@@ -1,26 +1,39 @@
 import streamlit as st
 import subprocess
+import os
+import sys
+from pathlib import Path
+
 from rag.pipeline import answer
+
+# Repo root (since this file is in repo root)
+BASE_DIR = Path(__file__).resolve().parent
 
 st.set_page_config(page_title="CeADAR RAG", layout="wide")
 st.title("CeADAR RAG Prototype")
 st.caption("Chat memory improves retrieval, while answers remain grounded ONLY in retrieved document context.")
-st.sidebar.caption("BUILD: sources-persist-v2")
+st.sidebar.caption("BUILD: sources-persist-v3")  # keep this on until fixed
 
 # ---------- Session State ----------
 if "messages" not in st.session_state:
-    # Each message can optionally include:
-    # - sources: list of retrieved chunks metadata
-    # - rewritten_query: retrieval query derived from conversation
-    st.session_state.messages = []  # [{"role": "user"/"assistant", "content": "...", "sources": [...]}]
+    st.session_state.messages = []
 
 # ---------- Sidebar ----------
 with st.sidebar:
     st.subheader("Indexing")
     st.write("If you changed documents, rebuild the index.")
+
     if st.button("Build/Rebuild Index"):
         with st.spinner("Building index..."):
-            result = subprocess.run(["python", "-m", "ingestion.build_index"], capture_output=True, text=True)
+            # ✅ Using current interpreter + force cwd to repo root
+            env = os.environ.copy()
+            result = subprocess.run(
+                [sys.executable, "-m", "ingestion.build_index"],
+                capture_output=True,
+                text=True,
+                cwd=str(BASE_DIR),
+                env=env
+            )
             if result.returncode == 0:
                 st.success("Index built successfully.")
                 st.code(result.stdout)
@@ -43,12 +56,11 @@ for m in st.session_state.messages:
     with st.chat_message(m["role"]):
         st.write(m["content"])
 
-        # Re-render sources for assistant messages on rerun 
-        if (
-            m["role"] == "assistant"
-            and show_context
-            and m.get("sources")
-        ):
+        if m["role"] == "assistant" and show_rewrite and m.get("rewritten_query"):
+            st.caption(f"Rewritten retrieval query: {m['rewritten_query']}")
+
+        # ✅ Re-render sources for assistant messages on rerun
+        if m["role"] == "assistant" and show_context and m.get("sources"):
             st.markdown("### Sources Used (Top Matches)")
             for s in m["sources"]:
                 meta = f"**[{s.get('rank', '?')}]** `{s.get('source_file', 'unknown')}`"
@@ -59,23 +71,14 @@ for m in st.session_state.messages:
                 st.markdown(meta)
                 st.code(s.get("text_preview", ""))
 
-        if (
-            m["role"] == "assistant"
-            and show_rewrite
-            and m.get("rewritten_query")
-        ):
-            st.caption(f"Rewritten retrieval query: {m['rewritten_query']}")
-
 # ---------- Chat Input ----------
 user_input = st.chat_input("Ask a question about the provided documents...")
 
 if user_input:
-    # Save + show user message
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.write(user_input)
 
-    # Generate answer
     with st.chat_message("assistant"):
         with st.spinner("Retrieving + generating..."):
             try:
@@ -87,11 +90,12 @@ if user_input:
 
                 st.write(res["answer"])
 
-                # Optional: show rewritten query for THIS turn
+                # ✅ DEBUG: confirm if retrieval is returning sources in production
+                st.caption(f"Retrieved sources: {len(res.get('sources', []))}")
+
                 if show_rewrite:
                     st.caption(f"Rewritten retrieval query: {res.get('rewritten_query', '')}")
 
-                # Optional: show sources for THIS turn
                 if show_context:
                     st.markdown("### Sources Used (Top Matches)")
                     for s in res.get("sources", []):
@@ -103,7 +107,7 @@ if user_input:
                         st.markdown(meta)
                         st.code(s.get("text_preview", ""))
 
-                # Saving assistant message WITH sources so they persist across reruns
+                # ✅ Save assistant message WITH sources
                 st.session_state.messages.append({
                     "role": "assistant",
                     "content": res["answer"],
