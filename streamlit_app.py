@@ -27,9 +27,9 @@ def build_index():
 
 
 st.set_page_config(page_title="CeADAR RAG", layout="wide")
-st.title("CeADAR RAG Prototype")
+st.title("CeADAR RAG")
 st.caption("Chat memory improves retrieval, while answers remain grounded ONLY in retrieved document context.")
-st.sidebar.caption("BUILD: sources-persist-v4")  # keep this on until fixed
+#st.sidebar.caption("BUILD: sources-persist-v4")  # keep this on until fixed
 
 
 if not index_exists():
