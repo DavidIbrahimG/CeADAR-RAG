@@ -18,10 +18,6 @@ def index_exists() -> bool:
     return CHROMA_PATH.exists() and any(CHROMA_PATH.iterdir())
 
 def write_index_meta(success: bool, stdout_text: str = "", stderr_text: str = ""):
-    """
-    Store minimal metadata to make the UI feel production-ready.
-    We keep it simple and robust: timestamp + success flag.
-    """
     CHROMA_PATH.mkdir(parents=True, exist_ok=True)
     meta = {
         "built_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -72,13 +68,6 @@ if not index_exists():
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Example prompts (great for interviewers)
-EXAMPLE_PROMPTS = [
-    "What is self-attention and why is it useful?",
-    "What are the key components of the Transformer architecture?",
-    "What are the main themes or obligations discussed in the EU AI Act document?",
-]
-
 # ---------- Sidebar ----------
 with st.sidebar:
     st.subheader("Status")
@@ -101,7 +90,6 @@ with st.sidebar:
             if result.returncode == 0:
                 write_index_meta(True, stdout_text=result.stdout)
                 st.success("Index built successfully.")
-                # Keep stdout behind an expander to avoid clutter
                 with st.expander("Build logs", expanded=False):
                     st.code(result.stdout)
             else:
@@ -123,17 +111,6 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
-# ---------- Example prompts (main area) ----------
-# These buttons help interviewers start quickly
-st.markdown("### Try an example question")
-cols = st.columns(len(EXAMPLE_PROMPTS))
-for i, p in enumerate(EXAMPLE_PROMPTS):
-    if cols[i].button(p):
-        st.session_state.messages.append({"role": "user", "content": p})
-        st.rerun()
-
-st.divider()
-
 # ---------- Chat History Display ----------
 for m in st.session_state.messages:
     with st.chat_message(m["role"]):
@@ -142,13 +119,13 @@ for m in st.session_state.messages:
         if m["role"] == "assistant" and show_rewrite and m.get("rewritten_query"):
             st.caption(f"Rewritten retrieval query: {m['rewritten_query']}")
 
-        # Sources displayed as expanders (clean UI)
         if m["role"] == "assistant" and show_context and m.get("sources"):
             st.markdown("### Sources Used (Top Matches)")
             for s in m["sources"]:
                 source_file = s.get("source_file", "unknown")
                 page = s.get("page", None)
                 dist = s.get("distance", None)
+
                 label = f"[{s.get('rank', '?')}] {source_file}"
                 if page is not None:
                     label += f" (page {page})"
@@ -186,6 +163,7 @@ if user_input:
                         source_file = s.get("source_file", "unknown")
                         page = s.get("page", None)
                         dist = s.get("distance", None)
+
                         label = f"[{s.get('rank', '?')}] {source_file}"
                         if page is not None:
                             label += f" (page {page})"
@@ -195,7 +173,6 @@ if user_input:
                         with st.expander(label, expanded=False):
                             st.code(s.get("text_preview", ""))
 
-                # Save assistant message WITH sources (persists across reruns)
                 st.session_state.messages.append({
                     "role": "assistant",
                     "content": res["answer"],
