@@ -9,10 +9,40 @@ from rag.pipeline import answer
 # Repo root (since this file is in repo root)
 BASE_DIR = Path(__file__).resolve().parent
 
+CHROMA_PATH = BASE_DIR / "chroma_db"
+
+def index_exists() -> bool:
+    # Chroma creates files/folders in this directory when an index exists
+    return CHROMA_PATH.exists() and any(CHROMA_PATH.iterdir())
+
+def build_index():
+    env = os.environ.copy()
+    return subprocess.run(
+        [sys.executable, "-m", "ingestion.build_index"],
+        capture_output=True,
+        text=True,
+        cwd=str(BASE_DIR),
+        env=env
+    )
+
+
 st.set_page_config(page_title="CeADAR RAG", layout="wide")
 st.title("CeADAR RAG Prototype")
 st.caption("Chat memory improves retrieval, while answers remain grounded ONLY in retrieved document context.")
-st.sidebar.caption("BUILD: sources-persist-v3")  # keep this on until fixed
+st.sidebar.caption("BUILD: sources-persist-v4")  # keep this on until fixed
+
+
+if not index_exists():
+    st.info("Index not found. Building it now (first run only)...")
+    with st.spinner("Building index..."):
+        result = build_index()
+    if result.returncode == 0:
+        st.success("Index built. You can now ask questions.")
+    else:
+        st.error("Auto index build failed.")
+        st.code(result.stderr)
+        st.stop()
+
 
 # ---------- Session State ----------
 if "messages" not in st.session_state:
